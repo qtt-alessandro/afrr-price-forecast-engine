@@ -31,3 +31,4 @@ df = data[['wind_offshore_dayahead', 'wind_onshore_dayahead',
        'da_price', 'prod_unbalance']]
 
 df.to_parquet("./data/afrr_price.parquet")
+print(df)
