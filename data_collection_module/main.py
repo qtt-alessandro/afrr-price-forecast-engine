@@ -5,11 +5,10 @@ from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 
 from entsoe import EntsoePandasClient
-from data_collection_module.renewable_generation_forecast import get_wind_solar_data
-from data_collection_module.afrr_data import get_afrr_data
-from data_collection_module.power_demand_forecast import get_load_forecasts
-from data_collection_module.day_ahead_data import get_day_ahead_prices
-
+from renewable_generation_forecast import get_wind_solar_data
+from afrr_data import get_afrr_data
+from power_demand_forecast import get_load_forecasts
+from day_ahead_data import get_day_ahead_prices
 
 load_dotenv(override=True)  
 entsoe_key = os.getenv('ENTSOE_API_KEY')

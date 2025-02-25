@@ -10,7 +10,7 @@
   - [ ] Validate multi-steps ARX model on full data (still waiting...)
   - [ ] Fit ARMAX model
   - [ ] Validate multi-steps ARMAXX model on full data
-- [] other
+- [ ] other
 
 ## Capacity Price Forecast
 
