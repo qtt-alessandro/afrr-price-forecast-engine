@@ -1,0 +1,15 @@
+{
+    "model_type": "xgb",
+    "parameters": {
+        "lags": 44,
+        "lags_past_covariates": 21,
+        "max_depth": 4,
+        "learning_rate": 0.19813310030402853,
+        "n_estimators": 113
+    },
+    "metrics": {
+        "rmse": 35.43954524304333,
+        "mape": 179.44114226420325
+    },
+    "timestamp": "2025-02-28_09-45-18"
+}
