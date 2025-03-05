@@ -8,11 +8,11 @@ import json
 import os
 import matplotlib.pyplot as plt
 from datetime import datetime
-from darts import concatenate
+from darts.timeseries import concatenate
 from darts.metrics import rmse, mape
 
 
-def save_model_results(model_type, best_params, metrics, output_dir="results"):
+def save_model_results(model_type, best_params, metrics, output_dir="afrr_price_ts_forecast/results"):
     """
     Save model parameters and performance metrics to a JSON file.
     
@@ -38,7 +38,7 @@ def save_model_results(model_type, best_params, metrics, output_dir="results"):
     }
     
     # Generate filename
-    filename = f"{model_type}_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    filename = f"{model_type}_hp_results.json"
     filepath = os.path.join(output_dir, filename)
     
     # Save to JSON

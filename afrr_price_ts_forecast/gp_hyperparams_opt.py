@@ -5,17 +5,18 @@ Gaussian Process Regression model for aFRR Price Forecasting
 
 This standalone module handles optimization and training for Gaussian Process models.
 """
+import sys
+import os
 
 import optuna
 from optuna.samplers import GPSampler
 from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
 from darts import concatenate
 
-# Import custom GP regressor
 from gp_regressor import GPRegressor
-
+from afrr_preprocessing import *
 # Import utility functions
-from utils import save_model_results, generate_historical_forecasts, plot_results
+from hyper_params_opt_utils import save_model_results, generate_historical_forecasts, plot_results
 
 
 def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train, exog_ts_scl_test, output_chunk_length=24, n_trials=10):
@@ -107,7 +108,7 @@ def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chu
     return model
 
 
-def main(data_path="../data/afrr_price.parquet", output_chunk_length=24, horizon=24, n_trials=10, save_results=True, output_dir="results"):
+def main(data_path=None, output_chunk_length=24, horizon=24, n_trials=10, save_results=True, output_dir="afrr_price_ts_forecast/results"):
     """
     Main function to run the complete GP model pipeline for aFRR price forecasting.
     
@@ -134,7 +135,7 @@ def main(data_path="../data/afrr_price.parquet", output_chunk_length=24, horizon
         exog_ts_scl_train, 
         exog_ts_scl_test,
         afrr_pr_scaler
-    ) = preprocess_afrr_data(data_path)
+    ) = preprocess_afrr_data("./data/afrr_price.parquet")
     
     # Optimize model
     best_params = optimize_model(

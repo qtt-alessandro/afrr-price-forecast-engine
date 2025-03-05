@@ -19,14 +19,12 @@ import pandas as pd
 
 # Custom modules
 from ssa import *
-
-# Darts - Time Series components
 from darts import TimeSeries
 from darts.dataprocessing import Pipeline
 from darts.dataprocessing.transformers import MissingValuesFiller, Scaler
 
 
-def load_and_prepare_data(data_path="../data/afrr_price.parquet"):
+def load_and_prepare_data(data_path="./data/afrr_price.parquet"):
     """
     Load and prepare the aFRR price data.
     
@@ -170,7 +168,7 @@ def split_data(afrr_pr_ts_scl, afrr_pr_ts_orig, exog_ts_scl,
 def preprocess_afrr_data(data_path="../data/afrr_price.parquet",
                          train_start="2024-10-01 22:00:00", 
                          test_start="2025-01-09 22:00:00", 
-                         test_end="2025-02-20 22:00:00"):
+                         test_end="2025-03-20 22:00:00"):
     """
     Complete preprocessing pipeline for aFRR data.
     

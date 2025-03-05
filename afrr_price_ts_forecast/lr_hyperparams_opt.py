@@ -1,23 +1,30 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-XGBoost model for aFRR Price Forecasting
+Linear Regression model for aFRR Price Forecasting
 
-This standalone module handles optimization and training for XGBoost models.
+This standalone module handles optimization and training for Linear Regression models.
 """
+import sys 
+import os 
+
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(parent_dir)
+
 
 import optuna
 from optuna.samplers import TPESampler
-from darts import concatenate
-from darts.models import XGBModel
+from darts.timeseries import concatenate
+from darts.models import LinearRegressionModel
+from afrr_preprocessing import preprocess_afrr_data
+from hyper_params_opt_utils import save_model_results, generate_historical_forecasts, plot_results
 
-# Import utility functions
-from utils import save_model_results, generate_historical_forecasts, plot_results
+
 
 
 def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train, exog_ts_scl_test, output_chunk_length=24, n_trials=10):
     """
-    Optimize XGBoost model hyperparameters.
+    Optimize Linear Regression model hyperparameters.
     
     Args:
         afrr_pr_ts_scl_train (TimeSeries): Training target data
@@ -30,33 +37,16 @@ def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train,
     Returns:
         dict: Best hyperparameters
     """
-    # Define time series encoders for XGBoost
-    ts_encoders = {
-        'cyclic': {'future': ['month']},
-        'datetime_attribute': {'future': ['hour', 'dayofweek']},
-        'position': {'past': ['relative'], 'future': ['relative']},
-        'tz': 'UTC'
-    }
-    
     def objective(trial):
         # Optimize lags
-        lags = trial.suggest_int("lags", 24, 96)
-        lags_past_covariates = trial.suggest_int("lags_past_covariates", 12, 48)
-        
-        # Optimize XGBoost specific parameters
-        max_depth = trial.suggest_int("max_depth", 3, 10)
-        learning_rate = trial.suggest_float("learning_rate", 0.01, 0.3, log=True)
-        n_estimators = trial.suggest_int("n_estimators", 50, 300)
+        lags_max = trial.suggest_int("lags_max", 100, 400)
+        lags_past_covariates_max = trial.suggest_int("lags_past_covariates_max", 50, 150)
         
         # Create and train model
-        model = XGBModel(
-            lags=lags,
-            lags_past_covariates=lags_past_covariates,
-            add_encoders=ts_encoders,
+        model = LinearRegressionModel(
             output_chunk_length=output_chunk_length,
-            max_depth=max_depth,
-            learning_rate=learning_rate,
-            n_estimators=n_estimators
+            lags=list(range(-1, -lags_max, -1)),
+            lags_past_covariates=list(range(-1, -lags_past_covariates_max, -1)),
         )
         
         try:
@@ -84,7 +74,7 @@ def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train,
     
     # Get best parameters
     best_params = study.best_params
-    print(f"Best parameters for XGB model: {best_params}")
+    print(f"Best parameters for LR model: {best_params}")
     print(f"Best RMSE: {study.best_value}")
     
     return best_params
@@ -92,7 +82,7 @@ def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train,
 
 def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chunk_length=24):
     """
-    Train XGBoost model with the best parameters.
+    Train Linear Regression model with the best parameters.
     
     Args:
         best_params (dict): Best hyperparameters from optimization
@@ -101,25 +91,13 @@ def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chu
         output_chunk_length (int): Output chunk length
         
     Returns:
-        XGBModel: Trained model
+        LinearRegressionModel: Trained model
     """
-    # Define time series encoders for XGBoost
-    ts_encoders = {
-        'cyclic': {'future': ['month']},
-        'datetime_attribute': {'future': ['hour', 'dayofweek']},
-        'position': {'past': ['relative'], 'future': ['relative']},
-        'tz': 'UTC'
-    }
-    
-    model = XGBModel(
-        lags=best_params["lags"],
-        lags_past_covariates=best_params["lags_past_covariates"],
-        add_encoders=ts_encoders,
+    model = LinearRegressionModel(
         output_chunk_length=output_chunk_length,
-        max_depth=best_params["max_depth"],
-        learning_rate=best_params["learning_rate"],
-        n_estimators=best_params["n_estimators"]
-    )
+        lags=list(range(-1, -best_params["lags_max"], -1)),
+        lags_past_covariates=list(range(-1, -best_params["lags_past_covariates_max"], -1))
+        )
     
     # Train the model
     model.fit(afrr_pr_ts_scl_train, past_covariates=exog_ts_scl_train)
@@ -127,9 +105,9 @@ def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chu
     return model
 
 
-def main(data_path="../data/afrr_price.parquet", output_chunk_length=24, horizon=24, n_trials=10, save_results=True, output_dir="results"):
+def main(data_path=None, output_chunk_length=24, horizon=24, n_trials=10, save_results=True, output_dir="afrr_price_ts_forecast/results"):
     """
-    Main function to run the complete XGB model pipeline for aFRR price forecasting.
+    Main function to run the complete LR model pipeline for aFRR price forecasting.
     
     Args:
         data_path (str): Path to the parquet file containing aFRR price data
@@ -143,7 +121,7 @@ def main(data_path="../data/afrr_price.parquet", output_chunk_length=24, horizon
         tuple: Tuple containing trained model, forecasts, best parameters, and metrics
     """
     # Import here to avoid circular imports
-    from afrr_preprocessing import preprocess_afrr_data
+
     
     # Preprocess data
     (
@@ -154,7 +132,7 @@ def main(data_path="../data/afrr_price.parquet", output_chunk_length=24, horizon
         exog_ts_scl_train, 
         exog_ts_scl_test,
         afrr_pr_scaler
-    ) = preprocess_afrr_data(data_path)
+    ) = preprocess_afrr_data("./data/afrr_price.parquet")
     
     # Optimize model
     best_params = optimize_model(
@@ -177,7 +155,7 @@ def main(data_path="../data/afrr_price.parquet", output_chunk_length=24, horizon
     # Generate historical forecasts
     hist_forecasts = generate_historical_forecasts(
         model=model, 
-        model_type="xgb",
+        model_type="lr",
         afrr_pr_ts_scl_test=afrr_pr_ts_scl_test, 
         exog_ts_scl_test=exog_ts_scl_test, 
         afrr_pr_scaler=afrr_pr_scaler,
@@ -185,11 +163,11 @@ def main(data_path="../data/afrr_price.parquet", output_chunk_length=24, horizon
     )
     
     # Plot results and get metrics
-    metrics = plot_results(afrr_pr_ts_orig_test, hist_forecasts, "xgb")
+    metrics = plot_results(afrr_pr_ts_orig_test, hist_forecasts, "lr")
     
     # Save results if requested
     if save_results:
-        save_model_results("xgb", best_params, metrics, output_dir)
+        save_model_results("lr", best_params, metrics, output_dir)
     
     return model, hist_forecasts, best_params, metrics
 
