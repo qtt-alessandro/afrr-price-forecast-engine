@@ -5,24 +5,17 @@ Linear Regression model for aFRR Price Forecasting
 
 This standalone module handles optimization and training for Linear Regression models.
 """
-import sys 
-import os 
-
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(parent_dir)
-
-
 import optuna
 from optuna.samplers import TPESampler
 from darts.timeseries import concatenate
 from darts.models import LinearRegressionModel
-from afrr_preprocessing import preprocess_afrr_data
-from hyper_params_opt_utils import save_model_results, generate_historical_forecasts, plot_results
+from utils.afrr_preprocessing import preprocess_afrr_data
+from utils.forecast_utils import save_model_results, generate_historical_forecasts, plot_results
+from darts.metrics import rmse
 
 
 
-
-def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train, exog_ts_scl_test, output_chunk_length=24, n_trials=10):
+def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train, exog_ts_scl_test, output_chunk_length, n_trials):
     """
     Optimize Linear Regression model hyperparameters.
     
@@ -60,19 +53,17 @@ def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train,
             )
             
             # Calculate error using Darts' RMSE function
-            from darts.metrics import rmse
+            
             error = rmse(afrr_pr_ts_scl_test, pred)
             return error
         except Exception as e:
             print(f"Error: {e}")
             return float("inf")
     
-    # Create study and optimize
     sampler = TPESampler()
     study = optuna.create_study(direction="minimize", sampler=sampler)
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
     
-    # Get best parameters
     best_params = study.best_params
     print(f"Best parameters for LR model: {best_params}")
     print(f"Best RMSE: {study.best_value}")
@@ -80,7 +71,7 @@ def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train,
     return best_params
 
 
-def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chunk_length=24):
+def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chunk_length):
     """
     Train Linear Regression model with the best parameters.
     
@@ -99,13 +90,12 @@ def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chu
         lags_past_covariates=list(range(-1, -best_params["lags_past_covariates_max"], -1))
         )
     
-    # Train the model
     model.fit(afrr_pr_ts_scl_train, past_covariates=exog_ts_scl_train)
     
     return model
 
 
-def main(data_path=None, output_chunk_length=24, horizon=24, n_trials=10, save_results=True, output_dir="afrr_price_ts_forecast/results"):
+def main(data_path, output_chunk_length, horizon, n_trials, save_results, output_dir):
     """
     Main function to run the complete LR model pipeline for aFRR price forecasting.
     
@@ -120,10 +110,8 @@ def main(data_path=None, output_chunk_length=24, horizon=24, n_trials=10, save_r
     Returns:
         tuple: Tuple containing trained model, forecasts, best parameters, and metrics
     """
-    # Import here to avoid circular imports
 
     
-    # Preprocess data
     (
         afrr_pr_ts_scl_train, 
         afrr_pr_ts_scl_test, 
@@ -132,9 +120,8 @@ def main(data_path=None, output_chunk_length=24, horizon=24, n_trials=10, save_r
         exog_ts_scl_train, 
         exog_ts_scl_test,
         afrr_pr_scaler
-    ) = preprocess_afrr_data("./data/afrr_price.parquet")
+    ) = preprocess_afrr_data(data_path)
     
-    # Optimize model
     best_params = optimize_model(
         afrr_pr_ts_scl_train=afrr_pr_ts_scl_train, 
         afrr_pr_ts_scl_test=afrr_pr_ts_scl_test, 
@@ -144,7 +131,6 @@ def main(data_path=None, output_chunk_length=24, horizon=24, n_trials=10, save_r
         n_trials=n_trials
     )
     
-    # Train model
     model = train_model(
         best_params=best_params, 
         afrr_pr_ts_scl_train=afrr_pr_ts_scl_train, 
@@ -162,10 +148,8 @@ def main(data_path=None, output_chunk_length=24, horizon=24, n_trials=10, save_r
         horizon=horizon
     )
     
-    # Plot results and get metrics
     metrics = plot_results(afrr_pr_ts_orig_test, hist_forecasts, "lr")
     
-    # Save results if requested
     if save_results:
         save_model_results("lr", best_params, metrics, output_dir)
     
@@ -173,4 +157,18 @@ def main(data_path=None, output_chunk_length=24, horizon=24, n_trials=10, save_r
 
 
 if __name__ == "__main__":
-    main()
+    default_data_path = "./data/afrr_price.parquet"
+    default_output_dir = "./data/results/"
+    default_output_chunk_length = 24
+    default_horizon = 24
+    default_n_trials = 10
+    default_save_results = True
+    
+    main(
+        data_path=default_data_path,
+        output_chunk_length=default_output_chunk_length,
+        horizon=default_horizon,
+        n_trials=default_n_trials,
+        save_results=default_save_results,
+        output_dir=default_output_dir
+    )

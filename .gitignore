@@ -172,3 +172,5 @@ cython_debug/
 junk/
 .ipynb_checkpoints
 *.ipynb
+
+results 

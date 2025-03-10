@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from darts.timeseries import concatenate
 from darts.metrics import rmse, mape
+from utils.afrr_preprocessing import preprocess_afrr_data
 
-
-def save_model_results(model_type, best_params, metrics, output_dir="afrr_price_ts_forecast/results"):
+def save_model_results(model_type, best_params, metrics, output_dir):
     """
     Save model parameters and performance metrics to a JSON file.
     
@@ -49,7 +49,7 @@ def save_model_results(model_type, best_params, metrics, output_dir="afrr_price_
     return filepath
 
 
-def generate_historical_forecasts(model, model_type, afrr_pr_ts_scl_test, exog_ts_scl_test, afrr_pr_scaler, horizon=24):
+def generate_historical_forecasts(model, model_type, afrr_pr_ts_scl_test, exog_ts_scl_test, afrr_pr_scaler, horizon):
     """
     Generate historical forecasts using the trained model.
     
@@ -66,7 +66,6 @@ def generate_historical_forecasts(model, model_type, afrr_pr_ts_scl_test, exog_t
     """
     print(f'Historical Forecast Using Fitted {model_type.upper()} Model...')
     
-    # Handle model-specific keyword arguments
     kwargs = {}
     if model_type == "gp":
         kwargs["predict_likelihood_parameters"] = False
@@ -122,4 +121,34 @@ def plot_results(afrr_pr_ts_orig_test, hist_forecasts, model_type):
     return {
         "rmse": float(error_rmse),
         "mape": float(error_mape)
+    }
+    
+def load_data(data_path):
+    """
+    Load and preprocess AFRR data
+    
+    Returns:
+        Tuple of preprocessed data components
+    """
+    return preprocess_afrr_data(data_path)
+
+def load_hyperparameters(file_path):
+
+    with open(file_path, 'r') as f:
+        model_hyper_opt_params_dict = json.load(f)
+
+    model_opt_params = model_hyper_opt_params_dict["parameters"]
+    
+    return model_opt_params
+
+def get_forecast_params():
+    """
+    Return common forecasting parameters used by both models
+    """
+    return {
+        'output_chunk_length': 24,
+        'forecast_horizon': 24, 
+        'stride': 24,
+        'start_idx': 24,
+        'quantiles': [0.1, 0.5, 0.9]
     }

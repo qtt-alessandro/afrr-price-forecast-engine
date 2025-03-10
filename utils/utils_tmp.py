@@ -3,6 +3,8 @@ import pandas as pd
 from darts import TimeSeries
 from darts.timeseries import concatenate
 from afrr_preprocessing import preprocess_afrr_data
+
+
 def load_data(data_path="../data/afrr_price.parquet"):
     """
     Load and preprocess AFRR data

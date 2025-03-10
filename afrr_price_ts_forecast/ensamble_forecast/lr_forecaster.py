@@ -3,8 +3,8 @@ from sklearn.linear_model import QuantileRegressor
 from darts import TimeSeries
 from darts.timeseries import concatenate
 from darts.models import RegressionModel
-
-from utils import load_data, load_hyperparameters, get_forecast_params
+from utils.forecast_utils import load_hyperparameters, get_forecast_params
+from utils.afrr_preprocessing import preprocess_afrr_data
 
 def train_lr_models(afrr_pr_ts_scl_train, exog_ts_scl_train, lr_params, output_chunk_length, quantiles):
     """
@@ -96,9 +96,32 @@ def generate_lr_forecasts(
     
     return lr_df_hat
 
-def run_lr_pipeline():
+def run_lr_pipeline(
+    data_path,
+    hyper_params_path,
+    train_start,
+    test_start,
+    test_end,
+    output_chunk_length,
+    forecast_horizon,
+    stride,
+    quantiles
+):
     """
     Run the full Linear Regression pipeline
+    
+    Args:
+        data_path: Path to the aFRR data file
+        train_start: Start date for training
+        test_start: Start date for testing
+        test_end: End date for testing
+        output_chunk_length: Length of forecast output chunks
+        forecast_horizon: Forecast horizon
+        stride: Stride for historical forecasts
+        quantiles: List of quantiles to calculate
+        
+    Returns:
+        Tuple of trained models and results
     """
     # Load data
     (
@@ -109,17 +132,10 @@ def run_lr_pipeline():
         exog_ts_scl_train, 
         exog_ts_scl_test,
         afrr_pr_scaler
-    ) = load_data()
+    ) = preprocess_afrr_data(data_path, train_start, test_start, test_end)
     
     # Load hyperparameters
-    lr_opt_params, _ = load_hyperparameters()
-    
-    # Get common forecast parameters
-    forecast_params = get_forecast_params()
-    output_chunk_length = forecast_params['output_chunk_length']
-    forecast_horizon = forecast_params['forecast_horizon']
-    stride = forecast_params['stride']
-    quantiles = forecast_params['quantiles']
+    lr_opt_params = load_hyperparameters(file_path=hyper_params_path)
     
     # Train LR models
     lr_models = train_lr_models(
@@ -146,5 +162,31 @@ def run_lr_pipeline():
     return lr_models, lr_results
 
 if __name__ == "__main__":
-    lr_models, lr_results = run_lr_pipeline()
+    # Define all parameters here at the end
+    data_path = "./data/afrr_price.parquet"
+    hyper_params_path = "./data/results/lr_hp_results.json"
+    train_start = "2024-10-01 22:00:00"
+    test_start = "2025-01-09 22:00:00"
+    test_end = "2025-03-20 22:00:00"
+    
+    # Get forecast parameters
+    forecast_params = get_forecast_params()
+    output_chunk_length = forecast_params['output_chunk_length']
+    forecast_horizon = forecast_params['forecast_horizon']
+    stride = forecast_params['stride']
+    quantiles = forecast_params['quantiles']
+    
+    # Run the pipeline with all parameters defined at the end
+    lr_models, lr_results = run_lr_pipeline(
+        data_path=data_path,
+        hyper_params_path=hyper_params_path,
+        train_start=train_start,
+        test_start=test_start,
+        test_end=test_end,
+        output_chunk_length=output_chunk_length,
+        forecast_horizon=forecast_horizon,
+        stride=stride,
+        quantiles=quantiles
+    )
+    
     print("LR forecasting completed. Results shape:", lr_results.shape)

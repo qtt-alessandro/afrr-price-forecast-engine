@@ -2,10 +2,11 @@ import pandas as pd
 from scipy import stats
 from darts import TimeSeries
 from darts.timeseries import concatenate
-from gp_regressor import GPRegressor
 from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
+from afrr_price_ts_forecast.models.gp_regressor import GPRegressor
+from utils.afrr_preprocessing import preprocess_afrr_data
+from utils.forecast_utils import load_hyperparameters, get_forecast_params
 
-from utils import load_data, load_hyperparameters, get_forecast_params
 
 def train_gp_model(afrr_pr_ts_scl_train, exog_ts_scl_train, gp_params, output_chunk_length):
     """
@@ -32,6 +33,7 @@ def train_gp_model(afrr_pr_ts_scl_train, exog_ts_scl_train, gp_params, output_ch
     gp_model.fit(afrr_pr_ts_scl_train, past_covariates=exog_ts_scl_train)
     
     return gp_model
+
 
 def generate_gp_forecasts(
     gp_model, 
@@ -93,11 +95,36 @@ def generate_gp_forecasts(
         
     return gp_df_hat
 
-def run_gp_pipeline():
+
+def run_gp_pipeline(
+    data_path,
+    hyper_params_path,
+    train_start,
+    test_start,
+    test_end,
+    output_chunk_length,
+    forecast_horizon,
+    stride,
+    quantiles
+):
     """
     Run the full Gaussian Process pipeline
+    
+    Args:
+        data_path: Path to the data file
+        hyper_params_path: Path to hyperparameters file
+        train_start: Start date for training data
+        test_start: Start date for test data
+        test_end: End date for test data
+        output_chunk_length: Length of forecast output chunks
+        forecast_horizon: Horizon for forecasting
+        stride: Stride for historical forecasts
+        quantiles: List of quantiles to calculate
+        
+    Returns:
+        Tuple containing the trained model and forecast results
     """
-    # Load data
+    # Load data with specified date ranges
     (
         afrr_pr_ts_scl_train, 
         afrr_pr_ts_scl_test, 
@@ -106,17 +133,10 @@ def run_gp_pipeline():
         exog_ts_scl_train, 
         exog_ts_scl_test,
         afrr_pr_scaler
-    ) = load_data()
+    ) = preprocess_afrr_data(data_path, train_start, test_start, test_end)
     
-    # Load hyperparameters
-    _, gp_opt_params = load_hyperparameters()
-    
-    # Get common forecast parameters
-    forecast_params = get_forecast_params()
-    output_chunk_length = forecast_params['output_chunk_length']
-    forecast_horizon = forecast_params['forecast_horizon']
-    stride = forecast_params['stride']
-    quantiles = forecast_params['quantiles']
+    # Load hyperparameters from specified path
+    gp_opt_params = load_hyperparameters(file_path=hyper_params_path)
     
     # Train GP model
     gp_model = train_gp_model(
@@ -141,6 +161,33 @@ def run_gp_pipeline():
     
     return gp_model, gp_results
 
+
 if __name__ == "__main__":
-    gp_model, gp_results = run_gp_pipeline()
+    # Define all parameters here at the end
+    data_path = "./data/afrr_price.parquet"
+    hyper_params_path = "./data/results/gp_hp_results.json"
+    train_start = "2024-10-01 22:00:00"
+    test_start = "2025-01-09 22:00:00"
+    test_end = "2025-03-20 22:00:00"
+    
+    # Get forecast parameters
+    forecast_params = get_forecast_params()
+    output_chunk_length = forecast_params['output_chunk_length']
+    forecast_horizon = forecast_params['forecast_horizon']
+    stride = forecast_params['stride']
+    quantiles = forecast_params['quantiles']
+    
+    # Run the pipeline with all parameters defined at the end
+    gp_model, gp_results = run_gp_pipeline(
+        data_path=data_path,
+        hyper_params_path=hyper_params_path,
+        train_start=train_start,
+        test_start=test_start,
+        test_end=test_end,
+        output_chunk_length=output_chunk_length,
+        forecast_horizon=forecast_horizon,
+        stride=stride,
+        quantiles=quantiles
+    )
+    
     print("GP forecasting completed. Results shape:", gp_results.shape)

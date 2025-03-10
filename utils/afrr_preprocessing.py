@@ -18,13 +18,13 @@ import numpy as np
 import pandas as pd
 
 # Custom modules
-from ssa import *
+from utils.ssa import mySSA
 from darts import TimeSeries
 from darts.dataprocessing import Pipeline
 from darts.dataprocessing.transformers import MissingValuesFiller, Scaler
 
 
-def load_and_prepare_data(data_path="./data/afrr_price.parquet"):
+def load_and_prepare_data(data_path=None):
     """
     Load and prepare the aFRR price data.
     
@@ -165,7 +165,7 @@ def split_data(afrr_pr_ts_scl, afrr_pr_ts_orig, exog_ts_scl,
     )
 
 
-def preprocess_afrr_data(data_path="../data/afrr_price.parquet",
+def preprocess_afrr_data(data_path=None,
                          train_start="2024-10-01 22:00:00", 
                          test_start="2025-01-09 22:00:00", 
                          test_end="2025-03-20 22:00:00"):
@@ -214,7 +214,7 @@ def preprocess_afrr_data(data_path="../data/afrr_price.parquet",
 if __name__ == "__main__":
     # Example of using the module for preprocessing
     print("Preprocessing aFRR data...")
-    data = load_and_prepare_data()
+    data = load_and_prepare_data(data_path='/home/alqua/git/boiler_OptiBid/data/afrr_price.parquet')
     data = apply_ssa_decomposition(data)
     afrr_pr_ts_scl, afrr_pr_ts_orig, exog_ts_scl, afrr_pr_scaler = prepare_time_series(data)
     

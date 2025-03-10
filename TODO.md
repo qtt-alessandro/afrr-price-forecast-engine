@@ -16,3 +16,10 @@
 
 - [x] Gather historical data: day-ahead, wind onshore,wind offshore, solar, load forecasts, imbalance. 
 - [x] Create an ensemble forecast for upward capacity price 
+
+
+## Picasso energy price forecasts7
+
+- [] Get data from entsoe using Lorena's api & energinet data
+- [] Just for the forecast function set nan to zero 
+- [] Add a trigger function to point out that we are enforcing nans to zero 
