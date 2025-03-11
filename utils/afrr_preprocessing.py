@@ -9,11 +9,7 @@ It can be used as a standalone module in Jupyter notebooks or imported by other 
 
 # Standard libraries
 import warnings
-warnings.filterwarnings("ignore")
 import logging
-logging.disable(logging.CRITICAL)
-
-# Data manipulation libraries
 import numpy as np
 import pandas as pd
 
@@ -22,6 +18,9 @@ from utils.ssa import mySSA
 from darts import TimeSeries
 from darts.dataprocessing import Pipeline
 from darts.dataprocessing.transformers import MissingValuesFiller, Scaler
+
+warnings.filterwarnings("ignore")
+logging.disable(logging.CRITICAL)
 
 
 def load_and_prepare_data(data_path=None):

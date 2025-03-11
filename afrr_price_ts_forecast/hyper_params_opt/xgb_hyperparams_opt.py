@@ -5,7 +5,6 @@ XGBoost model for aFRR Price Forecasting
 
 This standalone module handles optimization and training for XGBoost models.
 """
-
 import optuna
 from optuna.samplers import TPESampler
 from darts import concatenate

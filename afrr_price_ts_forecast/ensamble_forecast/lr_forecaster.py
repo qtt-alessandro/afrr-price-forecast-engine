@@ -81,7 +81,6 @@ def generate_lr_forecasts(
             verbose=True
         )
     
-    # Combine forecasts for all quantiles
     dfs = [
         afrr_pr_scaler.inverse_transform(
             concatenate(lr_backtest_forecasts[q]).with_columns_renamed(

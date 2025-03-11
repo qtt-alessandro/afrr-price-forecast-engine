@@ -16,7 +16,7 @@ entsoe_key = os.getenv('ENTSOE_API_KEY')
 client = EntsoePandasClient(api_key=entsoe_key)
 country_code = 'DK_1'
 start = pd.Timestamp('20240101', tz='Europe/Copenhagen')
-end = pd.Timestamp('20250228', tz='Europe/Copenhagen')
+end = pd.Timestamp('20250311', tz='Europe/Copenhagen')
 
 renewable_forecasts = get_wind_solar_data(start, end, price_area=country_code)
 afrr_data = get_afrr_data(start, end, price_area=country_code)
