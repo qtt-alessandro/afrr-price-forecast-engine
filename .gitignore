@@ -171,6 +171,6 @@ cython_debug/
 .pypirc
 junk/
 .ipynb_checkpoints
-*.ipynb
+
 
 results 
