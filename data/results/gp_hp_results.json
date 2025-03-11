@@ -1,0 +1,12 @@
+{
+    "model_type": "gp",
+    "parameters": {
+        "lags": 33,
+        "lags_past_covariates": 24
+    },
+    "metrics": {
+        "rmse": 24.825100859532583,
+        "mape": 143.83656080951175
+    },
+    "timestamp": "2025-03-10_15-47-30"
+}
