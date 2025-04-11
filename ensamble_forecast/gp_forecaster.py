@@ -3,7 +3,7 @@ from scipy import stats
 from darts import TimeSeries
 from darts.timeseries import concatenate
 from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
-from afrr_price_ts_forecast.models.gp_regressor import GPRegressor
+from models.gp_regressor import GPRegressor
 from utils.afrr_preprocessing import preprocess_afrr_data
 from utils.forecast_utils import load_hyperparameters, get_forecast_params
 

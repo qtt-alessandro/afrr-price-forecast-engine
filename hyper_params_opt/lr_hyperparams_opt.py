@@ -3,7 +3,8 @@
 """
 Linear Regression model for aFRR Price Forecasting
 
-This standalone module handles optimization and training for Linear Regression models.
+This standalone module handles optimization and training for Linear Regression models
+using a validation set for hyperparameter tuning.
 """
 import optuna
 from optuna.samplers import TPESampler
@@ -14,16 +15,15 @@ from utils.forecast_utils import save_model_results, generate_historical_forecas
 from darts.metrics import rmse
 
 
-
-def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train, exog_ts_scl_test, output_chunk_length, n_trials):
+def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, exog_ts_scl_train, exog_ts_scl_val, output_chunk_length, n_trials):
     """
-    Optimize Linear Regression model hyperparameters.
+    Optimize Linear Regression model hyperparameters using validation set.
     
     Args:
         afrr_pr_ts_scl_train (TimeSeries): Training target data
-        afrr_pr_ts_scl_test (TimeSeries): Test target data
+        afrr_pr_ts_scl_val (TimeSeries): Validation target data
         exog_ts_scl_train (TimeSeries): Training exogenous data
-        exog_ts_scl_test (TimeSeries): Test exogenous data
+        exog_ts_scl_val (TimeSeries): Validation exogenous data
         output_chunk_length (int): Output chunk length
         n_trials (int): Number of optimization trials
         
@@ -43,18 +43,17 @@ def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train,
         )
         
         try:
-            # Train the model
+            # Train the model on training data
             model.fit(afrr_pr_ts_scl_train, past_covariates=exog_ts_scl_train)
             
             # Make predictions on validation set
             pred = model.predict(
-                n=len(afrr_pr_ts_scl_test), 
-                past_covariates=concatenate([exog_ts_scl_train, exog_ts_scl_test], axis=0)
+                n=len(afrr_pr_ts_scl_val), 
+                past_covariates=concatenate([exog_ts_scl_train, exog_ts_scl_val], axis=0)
             )
             
-            # Calculate error using Darts' RMSE function
-            
-            error = rmse(afrr_pr_ts_scl_test, pred)
+            # Calculate error on validation set using Darts' RMSE function
+            error = rmse(afrr_pr_ts_scl_val, pred)
             return error
         except Exception as e:
             print(f"Error: {e}")
@@ -66,7 +65,7 @@ def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train,
     
     best_params = study.best_params
     print(f"Best parameters for LR model: {best_params}")
-    print(f"Best RMSE: {study.best_value}")
+    print(f"Best validation RMSE: {study.best_value}")
     
     return best_params
 
@@ -88,9 +87,39 @@ def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chu
         output_chunk_length=output_chunk_length,
         lags=list(range(-1, -best_params["lags_max"], -1)),
         lags_past_covariates=list(range(-1, -best_params["lags_past_covariates_max"], -1))
-        )
+    )
     
     model.fit(afrr_pr_ts_scl_train, past_covariates=exog_ts_scl_train)
+    
+    return model
+
+
+def train_final_model(best_params, afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, exog_ts_scl_train, exog_ts_scl_val, output_chunk_length):
+    """
+    Train the final model on combined training and validation data with best parameters.
+    
+    Args:
+        best_params (dict): Best hyperparameters from optimization
+        afrr_pr_ts_scl_train (TimeSeries): Training target data
+        afrr_pr_ts_scl_val (TimeSeries): Validation target data
+        exog_ts_scl_train (TimeSeries): Training exogenous data
+        exog_ts_scl_val (TimeSeries): Validation exogenous data
+        output_chunk_length (int): Output chunk length
+        
+    Returns:
+        LinearRegressionModel: Trained model on combined data
+    """
+    # Combine training and validation data
+    combined_train_data = concatenate([afrr_pr_ts_scl_train, afrr_pr_ts_scl_val], axis=0)
+    combined_exog_data = concatenate([exog_ts_scl_train, exog_ts_scl_val], axis=0)
+    
+    model = LinearRegressionModel(
+        output_chunk_length=output_chunk_length,
+        lags=list(range(-1, -best_params["lags_max"], -1)),
+        lags_past_covariates=list(range(-1, -best_params["lags_past_covariates_max"], -1))
+    )
+    
+    model.fit(combined_train_data, past_covariates=combined_exog_data)
     
     return model
 
@@ -110,37 +139,50 @@ def main(data_path, output_chunk_length, horizon, n_trials, save_results, output
     Returns:
         tuple: Tuple containing trained model, forecasts, best parameters, and metrics
     """
-
-    
+    # Process data with validation split
     (
         afrr_pr_ts_scl_train, 
+        afrr_pr_ts_scl_val,
         afrr_pr_ts_scl_test, 
-        afrr_pr_ts_orig_train, 
+        afrr_pr_ts_orig_train,
+        afrr_pr_ts_orig_val, 
         afrr_pr_ts_orig_test, 
-        exog_ts_scl_train, 
+        exog_ts_scl_train,
+        exog_ts_scl_val, 
         exog_ts_scl_test,
         afrr_pr_scaler
-    ) = preprocess_afrr_data(data_path)
+    ) = preprocess_afrr_data(
+        data_path=data_path,
+        train_start="2024-10-10 00:00:00",
+        val_start="2025-01-01 00:00:00",
+        test_start="2025-03-01 00:00:00",
+        test_end="2025-04-09 23:59:59",
+        use_validation=True
+    )
     
+    # Find best hyperparameters using validation set
     best_params = optimize_model(
         afrr_pr_ts_scl_train=afrr_pr_ts_scl_train, 
-        afrr_pr_ts_scl_test=afrr_pr_ts_scl_test, 
+        afrr_pr_ts_scl_val=afrr_pr_ts_scl_val,
         exog_ts_scl_train=exog_ts_scl_train, 
-        exog_ts_scl_test=exog_ts_scl_test,
+        exog_ts_scl_val=exog_ts_scl_val,
         output_chunk_length=output_chunk_length,
         n_trials=n_trials
     )
     
-    model = train_model(
-        best_params=best_params, 
-        afrr_pr_ts_scl_train=afrr_pr_ts_scl_train, 
+    # Train model on combined training+validation data for final evaluation
+    final_model = train_final_model(
+        best_params=best_params,
+        afrr_pr_ts_scl_train=afrr_pr_ts_scl_train,
+        afrr_pr_ts_scl_val=afrr_pr_ts_scl_val,
         exog_ts_scl_train=exog_ts_scl_train,
+        exog_ts_scl_val=exog_ts_scl_val,
         output_chunk_length=output_chunk_length
     )
     
-    # Generate historical forecasts
+    # Generate historical forecasts on test set
     hist_forecasts = generate_historical_forecasts(
-        model=model, 
+        model=final_model, 
         model_type="lr",
         afrr_pr_ts_scl_test=afrr_pr_ts_scl_test, 
         exog_ts_scl_test=exog_ts_scl_test, 
@@ -148,17 +190,19 @@ def main(data_path, output_chunk_length, horizon, n_trials, save_results, output
         horizon=horizon
     )
     
+    # Evaluate on test set
     metrics = plot_results(afrr_pr_ts_orig_test, hist_forecasts, "lr")
+    print(f"Test set metrics: {metrics}")
     
     if save_results:
         save_model_results("lr", best_params, metrics, output_dir)
     
-    return model, hist_forecasts, best_params, metrics
+    return final_model, hist_forecasts, best_params, metrics
 
 
 if __name__ == "__main__":
-    default_data_path = "./data/afrr_price.parquet"
-    default_output_dir = "./data/results/"
+    default_data_path = "../data/afrr_price.parquet"
+    default_output_dir = "../data/results/"
     default_output_chunk_length = 24
     default_horizon = 24
     default_n_trials = 10

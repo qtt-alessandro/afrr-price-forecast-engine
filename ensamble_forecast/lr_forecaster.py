@@ -162,8 +162,8 @@ def run_lr_pipeline(
 
 if __name__ == "__main__":
     # Define all parameters here at the end
-    data_path = "./data/afrr_price.parquet"
-    hyper_params_path = "./data/results/lr_hp_results.json"
+    data_path = "../data/afrr_price.parquet"
+    hyper_params_path = "../data/results/lr_hp_results.json"
     train_start = "2024-10-01 22:00:00"
     test_start = "2025-01-09 22:00:00"
     test_end = "2025-03-20 22:00:00"

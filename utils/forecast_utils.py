@@ -113,14 +113,14 @@ def plot_results(afrr_pr_ts_orig_test, hist_forecasts, model_type):
     
     # Calculate error metrics
     error_rmse = rmse(afrr_pr_ts_orig_test, hist_forecasts)
-    error_mape = mape(afrr_pr_ts_orig_test, hist_forecasts)
+    #error_mape = mape(afrr_pr_ts_orig_test.clip_lower(0), hist_forecasts)
     print(f"RMSE: {error_rmse:.4f}")
-    print(f"MAPE: {error_mape:.4f}")
+    #print(f"MAPE: {error_mape:.4f}")
     
     # Return metrics as dictionary
     return {
         "rmse": float(error_rmse),
-        "mape": float(error_mape)
+        "mape": None
     }
     
 def load_data(data_path):

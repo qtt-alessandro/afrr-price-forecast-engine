@@ -8,16 +8,7 @@ from utils.afrr_preprocessing import preprocess_afrr_data
 
 def train_xgb_model(afrr_pr_ts_scl_train, exog_ts_scl_train, xgb_params, output_chunk_length):
     """
-    Train XGBoost model
-    
-    Args:
-        afrr_pr_ts_scl_train: Scaled training data for AFRR price
-        exog_ts_scl_train: Scaled training data for exogenous variables
-        xgb_params: Hyperparameters for XGBoost model
-        output_chunk_length: Length of forecast output chunks
-        
-    Returns:
-        Trained XGBoost model
+    Train XGBoost model with quantile regression
     """
     # Define time series encoders for XGBoost
     ts_encoders = {
@@ -31,11 +22,16 @@ def train_xgb_model(afrr_pr_ts_scl_train, exog_ts_scl_train, xgb_params, output_
     xgb_model = XGBModel(
         lags=xgb_params["lags"],
         lags_past_covariates=xgb_params["lags_past_covariates"],
-        add_encoders=ts_encoders,
         output_chunk_length=output_chunk_length,
         max_depth=xgb_params["max_depth"],
         learning_rate=xgb_params["learning_rate"],
-        n_estimators=xgb_params["n_estimators"]
+        n_estimators=xgb_params["n_estimators"],
+        # For quantile regression, use the following:
+        objective="reg:quantileerror",  # New in XGBoost 2.0
+        quantile_alpha=[0.1, 0.5, 0.9],  # Specify quantiles here
+        # Alternatively, if using older XGBoost:
+        # objective="reg:quantile",
+        # quantile_alpha=0.5,  # For median regression
     )
 
     xgb_model.fit(afrr_pr_ts_scl_train, past_covariates=exog_ts_scl_train)
@@ -54,18 +50,7 @@ def generate_xgb_forecasts(
     afrr_pr_scaler
 ):
     """
-    Generate forecasts using the XGBoost model
-    
-    Args:
-        xgb_model: Trained XGBoost model
-        afrr_pr_ts_scl_train, afrr_pr_ts_scl_test: Scaled training and test data for AFRR price
-        exog_ts_scl_train, exog_ts_scl_test: Scaled training and test data for exogenous variables
-        forecast_horizon: Horizon for forecasting
-        stride: Stride for historical forecasts
-        afrr_pr_scaler: Scaler for inverse transformation
-        
-    Returns:
-        DataFrame with forecast results
+    Generate forecasts with quantile outputs
     """
     # Generate backtests
     xgb_backtest_forecasts = xgb_model.historical_forecasts(
@@ -78,12 +63,13 @@ def generate_xgb_forecasts(
         last_points_only=False,
         verbose=True
     )
-
-    xgb_df_hat = afrr_pr_scaler.inverse_transform(concatenate(xgb_backtest_forecasts)).pd_dataframe()
-    xgb_df_hat.columns = ['xgb_afrr_up_cap_price']
     
-    return xgb_df_hat
-
+    quantile_results = []
+    for forecast in xgb_backtest_forecasts:
+        df = forecast.pd_dataframe()
+        quantile_results.append(df)
+    
+    return quantile_results
 
 def run_xgb_pipeline(
     data_path,

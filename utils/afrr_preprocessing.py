@@ -114,9 +114,11 @@ def prepare_time_series(data):
 def split_data(afrr_pr_ts_scl, afrr_pr_ts_orig, exog_ts_scl, 
                train_start="2024-10-01 22:00:00", 
                test_start="2025-01-09 22:00:00", 
-               test_end="2025-02-20 22:00:00"):
+               test_end="2025-02-20 22:00:00",
+               val_start=None,
+               use_validation=False):
     """
-    Split data into training and test sets.
+    Split data into training and test sets, with optional validation set.
     
     Args:
         afrr_pr_ts_scl (TimeSeries): Scaled target series
@@ -125,15 +127,18 @@ def split_data(afrr_pr_ts_scl, afrr_pr_ts_orig, exog_ts_scl,
         train_start (str): Start date for training data
         test_start (str): Start date for test data
         test_end (str): End date for test data
+        val_start (str, optional): Start date for validation data. Only used if use_validation=True.
+        use_validation (bool): Whether to include a validation set in the split.
         
     Returns:
-        tuple: Tuple containing split datasets:
-            - afrr_pr_ts_scl_train (TimeSeries): Training target scaled
-            - afrr_pr_ts_scl_test (TimeSeries): Test target scaled
-            - afrr_pr_ts_orig_train (TimeSeries): Training target original
-            - afrr_pr_ts_orig_test (TimeSeries): Test target original
-            - exog_ts_scl_train (TimeSeries): Training exogenous scaled
-            - exog_ts_scl_test (TimeSeries): Test exogenous scaled
+        tuple: Tuple containing split datasets. If use_validation=True, returns:
+            - afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, afrr_pr_ts_scl_test
+            - afrr_pr_ts_orig_train, afrr_pr_ts_orig_val, afrr_pr_ts_orig_test
+            - exog_ts_scl_train, exog_ts_scl_val, exog_ts_scl_test
+        Otherwise returns:
+            - afrr_pr_ts_scl_train, afrr_pr_ts_scl_test
+            - afrr_pr_ts_orig_train, afrr_pr_ts_orig_test
+            - exog_ts_scl_train, exog_ts_scl_test
     """
     # Convert string to timestamps if provided as strings
     if isinstance(train_start, str):
@@ -143,31 +148,66 @@ def split_data(afrr_pr_ts_scl, afrr_pr_ts_orig, exog_ts_scl,
     if isinstance(test_end, str):
         test_end = pd.Timestamp(test_end)
     
-    # Split target series
-    afrr_pr_ts_scl_train = afrr_pr_ts_scl[train_start : test_start - afrr_pr_ts_scl.freq]
-    afrr_pr_ts_scl_test = afrr_pr_ts_scl[test_start : test_end]
-    
-    afrr_pr_ts_orig_train = afrr_pr_ts_orig[train_start : test_start - afrr_pr_ts_scl.freq]
-    afrr_pr_ts_orig_test = afrr_pr_ts_orig[test_start : test_end]
-    
-    # Split exogenous series
-    exog_ts_scl_train = exog_ts_scl[train_start : test_start - exog_ts_scl.freq]
-    exog_ts_scl_test = exog_ts_scl[test_start : test_end]
-    
-    return (
-        afrr_pr_ts_scl_train, 
-        afrr_pr_ts_scl_test, 
-        afrr_pr_ts_orig_train, 
-        afrr_pr_ts_orig_test, 
-        exog_ts_scl_train, 
-        exog_ts_scl_test
-    )
+    if use_validation:
+        if val_start is None:
+            # Default validation start date if not provided (halfway between train and test)
+            val_start = train_start + (test_start - train_start) / 2
+        elif isinstance(val_start, str):
+            val_start = pd.Timestamp(val_start)
+        
+        # Split target series with validation
+        afrr_pr_ts_scl_train = afrr_pr_ts_scl[train_start : val_start - afrr_pr_ts_scl.freq]
+        afrr_pr_ts_scl_val = afrr_pr_ts_scl[val_start : test_start - afrr_pr_ts_scl.freq]
+        afrr_pr_ts_scl_test = afrr_pr_ts_scl[test_start : test_end]
+        
+        afrr_pr_ts_orig_train = afrr_pr_ts_orig[train_start : val_start - afrr_pr_ts_orig.freq]
+        afrr_pr_ts_orig_val = afrr_pr_ts_orig[val_start : test_start - afrr_pr_ts_orig.freq]
+        afrr_pr_ts_orig_test = afrr_pr_ts_orig[test_start : test_end]
+        
+        # Split exogenous series
+        exog_ts_scl_train = exog_ts_scl[train_start : val_start - exog_ts_scl.freq]
+        exog_ts_scl_val = exog_ts_scl[val_start : test_start - exog_ts_scl.freq]
+        exog_ts_scl_test = exog_ts_scl[test_start : test_end]
+        
+        return (
+            afrr_pr_ts_scl_train, 
+            afrr_pr_ts_scl_val,
+            afrr_pr_ts_scl_test, 
+            afrr_pr_ts_orig_train,
+            afrr_pr_ts_orig_val, 
+            afrr_pr_ts_orig_test, 
+            exog_ts_scl_train,
+            exog_ts_scl_val, 
+            exog_ts_scl_test
+        )
+    else:
+        # Split target series without validation
+        afrr_pr_ts_scl_train = afrr_pr_ts_scl[train_start : test_start - afrr_pr_ts_scl.freq]
+        afrr_pr_ts_scl_test = afrr_pr_ts_scl[test_start : test_end]
+        
+        afrr_pr_ts_orig_train = afrr_pr_ts_orig[train_start : test_start - afrr_pr_ts_orig.freq]
+        afrr_pr_ts_orig_test = afrr_pr_ts_orig[test_start : test_end]
+        
+        # Split exogenous series
+        exog_ts_scl_train = exog_ts_scl[train_start : test_start - exog_ts_scl.freq]
+        exog_ts_scl_test = exog_ts_scl[test_start : test_end]
+        
+        return (
+            afrr_pr_ts_scl_train, 
+            afrr_pr_ts_scl_test, 
+            afrr_pr_ts_orig_train, 
+            afrr_pr_ts_orig_test, 
+            exog_ts_scl_train, 
+            exog_ts_scl_test
+        )
 
 
 def preprocess_afrr_data(data_path=None,
-                         train_start="2024-10-01 22:00:00", 
-                         test_start="2025-01-09 22:00:00", 
-                         test_end="2025-03-20 22:00:00"):
+                         train_start=None, 
+                         test_start=None, 
+                         test_end=None,
+                         val_start=None,
+                         use_validation=False):
     """
     Complete preprocessing pipeline for aFRR data.
     
@@ -176,16 +216,18 @@ def preprocess_afrr_data(data_path=None,
         train_start (str): Start date for training data
         test_start (str): Start date for test data
         test_end (str): End date for test data
+        val_start (str, optional): Start date for validation data. Only used if use_validation=True.
+        use_validation (bool): Whether to include a validation set in the split.
         
     Returns:
-        tuple: Tuple containing all necessary data for modeling:
-            - afrr_pr_ts_scl_train (TimeSeries): Training target scaled
-            - afrr_pr_ts_scl_test (TimeSeries): Test target scaled
-            - afrr_pr_ts_orig_train (TimeSeries): Training target original
-            - afrr_pr_ts_orig_test (TimeSeries): Test target original
-            - exog_ts_scl_train (TimeSeries): Training exogenous scaled
-            - exog_ts_scl_test (TimeSeries): Test exogenous scaled
-            - afrr_pr_scaler (Pipeline): Scaler for target variable
+        tuple: Tuple containing all necessary data for modeling. If use_validation=True, returns:
+            - afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, afrr_pr_ts_scl_test
+            - afrr_pr_ts_orig_train, afrr_pr_ts_orig_val, afrr_pr_ts_orig_test
+            - exog_ts_scl_train, exog_ts_scl_val, exog_ts_scl_test, afrr_pr_scaler
+        Otherwise returns:
+            - afrr_pr_ts_scl_train, afrr_pr_ts_scl_test
+            - afrr_pr_ts_orig_train, afrr_pr_ts_orig_test
+            - exog_ts_scl_train, exog_ts_scl_test, afrr_pr_scaler
     """
     # Load and prepare data
     data = load_and_prepare_data(data_path)
@@ -203,20 +245,10 @@ def preprocess_afrr_data(data_path=None,
         exog_ts_scl,
         train_start,
         test_start,
-        test_end
+        test_end,
+        val_start,
+        use_validation
     )
     
     # Return all components needed for modeling
     return (*splits, afrr_pr_scaler)
-
-
-if __name__ == "__main__":
-    # Example of using the module for preprocessing
-    print("Preprocessing aFRR data...")
-    data = load_and_prepare_data(data_path='/home/alqua/git/boiler_OptiBid/data/afrr_price.parquet')
-    data = apply_ssa_decomposition(data)
-    afrr_pr_ts_scl, afrr_pr_ts_orig, exog_ts_scl, afrr_pr_scaler = prepare_time_series(data)
-    
-    print("Data preprocessing completed.")
-    print("Target time series shape:", afrr_pr_ts_scl.shape)
-    print("Exogenous time series shape:", exog_ts_scl.shape)

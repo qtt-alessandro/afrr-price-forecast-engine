@@ -1,0 +1,12 @@
+{
+    "model_type": "lr",
+    "parameters": {
+        "lags_max": 226,
+        "lags_past_covariates_max": 97
+    },
+    "metrics": {
+        "rmse": 24.204247730306363,
+        "mape": null
+    },
+    "timestamp": "2025-04-10_13-57-42"
+}

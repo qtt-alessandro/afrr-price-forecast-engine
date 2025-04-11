@@ -226,7 +226,8 @@ class mySSA(object):
             forecast_df.plot(title='Forecasted vs. original time series', **plotargs)
         if return_df:
             return forecast_df
-            
+
+"""
 if __name__=='__main__':
     from mySSA import mySSA
     from pandas import DataFrame as df
@@ -260,3 +261,4 @@ if __name__=='__main__':
 
     # FORECASTING
     ssa.forecast_recurrent(steps_ahead=48, plot=True)
+"""            
