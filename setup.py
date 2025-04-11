@@ -11,6 +11,8 @@ setup(
         "afrr_price_ts_forecast.*",
         "data_collection_module",
         "data_collection_module.*",
+        "models"
+        "models.*"
         "utils",
         "utils.*"
     ]),
