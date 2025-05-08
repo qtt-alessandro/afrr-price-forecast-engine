@@ -1,0 +1,12 @@
+{
+    "model_type": "lr_aFRR_UpCapPriceEUR",
+    "parameters": {
+        "lags_max": 94,
+        "lags_past_covariates_max": 59
+    },
+    "metrics": {
+        "rmse": 20.007599569955577,
+        "mape": null
+    },
+    "timestamp": "2025-05-08_11-28-46"
+}

@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Gaussian Process Regression model for aFRR Price Forecasting
 
-This standalone module handles optimization and training for Gaussian Process models
-using a validation set for hyperparameter tuning.
-"""
 import optuna
 from optuna.samplers import GPSampler
 from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
@@ -18,20 +13,7 @@ from utils.forecast_utils import save_model_results, generate_historical_forecas
 
 
 def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, exog_ts_scl_train, exog_ts_scl_val, output_chunk_length, n_trials):
-    """
-    Optimize Gaussian Process model hyperparameters using validation set.
-    
-    Args:
-        afrr_pr_ts_scl_train (TimeSeries): Training target data
-        afrr_pr_ts_scl_val (TimeSeries): Validation target data
-        exog_ts_scl_train (TimeSeries): Training exogenous data
-        exog_ts_scl_val (TimeSeries): Validation exogenous data
-        output_chunk_length (int): Output chunk length
-        n_trials (int): Number of optimization trials
-        
-    Returns:
-        dict: Best hyperparameters
-    """
+
     kernel = DotProduct() + WhiteKernel()
     
     def objective(trial):
@@ -78,18 +60,7 @@ def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, exog_ts_scl_train, 
 
 
 def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chunk_length):
-    """
-    Train Gaussian Process model with the best parameters.
-    
-    Args:
-        best_params (dict): Best hyperparameters from optimization
-        afrr_pr_ts_scl_train (TimeSeries): Training target data
-        exog_ts_scl_train (TimeSeries): Training exogenous data
-        output_chunk_length (int): Output chunk length
-        
-    Returns:
-        GPRegressor: Trained model
-    """
+
     kernel = DotProduct() + WhiteKernel()
     
     model = GPRegressor(
@@ -106,20 +77,7 @@ def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chu
 
 
 def train_final_model(best_params, afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, exog_ts_scl_train, exog_ts_scl_val, output_chunk_length):
-    """
-    Train the final model on combined training and validation data with best parameters.
-    
-    Args:
-        best_params (dict): Best hyperparameters from optimization
-        afrr_pr_ts_scl_train (TimeSeries): Training target data
-        afrr_pr_ts_scl_val (TimeSeries): Validation target data
-        exog_ts_scl_train (TimeSeries): Training exogenous data
-        exog_ts_scl_val (TimeSeries): Validation exogenous data
-        output_chunk_length (int): Output chunk length
-        
-    Returns:
-        GPRegressor: Trained model on combined data
-    """
+
     # Combine training and validation data
     combined_train_data = concatenate([afrr_pr_ts_scl_train, afrr_pr_ts_scl_val], axis=0)
     combined_exog_data = concatenate([exog_ts_scl_train, exog_ts_scl_val], axis=0)
@@ -133,28 +91,13 @@ def train_final_model(best_params, afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, exo
         kernel=kernel
     )
     
-    # Train the model on combined data
     model.fit(combined_train_data, past_covariates=combined_exog_data)
     
     return model
 
 
-def main(data_path, output_chunk_length, horizon, n_trials, save_results, output_dir):
-    """
-    Main function to run the complete GP model pipeline for aFRR price forecasting.
-    
-    Args:
-        data_path (str): Path to the parquet file containing aFRR price data
-        output_chunk_length (int): Output chunk length
-        horizon (int): Forecast horizon
-        n_trials (int): Number of optimization trials
-        save_results (bool): Whether to save results to JSON
-        output_dir (str): Directory to save results
-        
-    Returns:
-        tuple: Tuple containing trained model, forecasts, best parameters, and metrics
-    """
-    # Process data with validation split
+def main(data_path, output_chunk_length, horizon, n_trials, target_col, save_results, output_dir):
+
     (
         afrr_pr_ts_scl_train, 
         afrr_pr_ts_scl_val,
@@ -172,10 +115,10 @@ def main(data_path, output_chunk_length, horizon, n_trials, save_results, output
         val_start="2025-01-01 00:00:00",
         test_start="2025-03-01 00:00:00",
         test_end="2025-04-09 23:59:59",
-        use_validation=True
+        use_validation=True,
+        target_col=target_col
     )
     
-    # Find best hyperparameters using validation set
     best_params = optimize_model(
         afrr_pr_ts_scl_train=afrr_pr_ts_scl_train, 
         afrr_pr_ts_scl_val=afrr_pr_ts_scl_val,
@@ -185,7 +128,6 @@ def main(data_path, output_chunk_length, horizon, n_trials, save_results, output
         n_trials=n_trials
     )
     
-    # Train model on combined training+validation data for final evaluation
     final_model = train_final_model(
         best_params=best_params,
         afrr_pr_ts_scl_train=afrr_pr_ts_scl_train,
@@ -195,36 +137,33 @@ def main(data_path, output_chunk_length, horizon, n_trials, save_results, output
         output_chunk_length=output_chunk_length
     )
     
-    # Generate historical forecasts on test set
     hist_forecasts = generate_historical_forecasts(
         model=final_model, 
         model_type="gp",
         afrr_pr_ts_scl_test=afrr_pr_ts_scl_test, 
         exog_ts_scl_test=exog_ts_scl_test, 
         afrr_pr_scaler=afrr_pr_scaler,
-        horizon=horizon
+        horizon=horizon,
+        target_col=target_col
     )
     
-    # Clip forecasts to ensure positive values before evaluation
     hist_forecasts_clipped = hist_forecasts
     
-    # Plot results and get metrics
     metrics = plot_results(afrr_pr_ts_orig_test, hist_forecasts_clipped, "gp")
     print(f"Test set metrics: {metrics}")
     
-    # Save results if requested
     if save_results:
-        save_model_results("gp", best_params, metrics, output_dir)
+        save_model_results("gp_" + str(target_col), best_params, metrics, output_dir)
     
     return final_model, hist_forecasts_clipped, best_params, metrics
 
 
 if __name__ == "__main__":
-    default_data_path = "../data/afrr_price.parquet"
-    default_output_dir = "../data/results/"
+    default_data_path = "./data/afrr_price.parquet"
+    default_output_dir = "./data/results/"
     default_output_chunk_length = 24
     default_horizon = 24
-    default_n_trials = 10
+    default_n_trials = 1
     default_save_results = True
     
     main(
@@ -232,6 +171,7 @@ if __name__ == "__main__":
         output_chunk_length=default_output_chunk_length,
         horizon=default_horizon,
         n_trials=default_n_trials,
+        target_col='aFRR_DownCapPriceEUR',
         save_results=default_save_results,
         output_dir=default_output_dir
     )

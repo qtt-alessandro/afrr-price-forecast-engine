@@ -13,23 +13,10 @@ from darts.metrics import rmse, mape
 from utils.afrr_preprocessing import preprocess_afrr_data
 
 def save_model_results(model_type, best_params, metrics, output_dir):
-    """
-    Save model parameters and performance metrics to a JSON file.
-    
-    Args:
-        model_type (str): Type of model (gp, lr, xgb)
-        best_params (dict): Best hyperparameters from optimization
-        metrics (dict): Performance metrics (RMSE, MAPE)
-        output_dir (str): Directory to save results
-    
-    Returns:
-        str: Path to the saved JSON file
-    """
-    # Create output directory if it doesn't exist
+
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
-    # Create a results dictionary
     results = {
         "model_type": model_type,
         "parameters": best_params,
@@ -49,7 +36,7 @@ def save_model_results(model_type, best_params, metrics, output_dir):
     return filepath
 
 
-def generate_historical_forecasts(model, model_type, afrr_pr_ts_scl_test, exog_ts_scl_test, afrr_pr_scaler, horizon):
+def generate_historical_forecasts(model, model_type, afrr_pr_ts_scl_test, exog_ts_scl_test, afrr_pr_scaler, horizon, target_col):
     """
     Generate historical forecasts using the trained model.
     
@@ -83,9 +70,13 @@ def generate_historical_forecasts(model, model_type, afrr_pr_ts_scl_test, exog_t
     )
     
     hist_forecasts = concatenate(hist_forecasts)
-    hist_forecasts = hist_forecasts.with_columns_renamed('aFRR_UpCapPriceEUR_cl', f'afrr_up_cap_price_{model_type}_hat')
-    hist_forecasts = afrr_pr_scaler.inverse_transform(hist_forecasts)
-    
+    if target_col == 'aFRR_UpCapPriceEUR':
+        hist_forecasts = hist_forecasts.with_columns_renamed('aFRR_UpCapPriceEUR_cl', f'afrr_up_cap_price_{model_type}_hat')
+        hist_forecasts = afrr_pr_scaler.inverse_transform(hist_forecasts)
+    elif target_col == 'aFRR_DownCapPriceEUR':
+        hist_forecasts = hist_forecasts.with_columns_renamed('aFRR_DownCapPriceEUR_cl', f'afrr_down_cap_price_{model_type}_hat')
+        hist_forecasts = afrr_pr_scaler.inverse_transform(hist_forecasts)
+        
     return hist_forecasts
 
 

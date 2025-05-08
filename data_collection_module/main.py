@@ -5,18 +5,18 @@ from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 
 from entsoe import EntsoePandasClient
-from renewable_generation_forecast import get_wind_solar_data
-from afrr_data import get_afrr_data
-from power_demand_forecast import get_load_forecasts
-from day_ahead_data import get_day_ahead_prices
+from data_collection_module.fetch_res_forecast import get_wind_solar_data
+from data_collection_module.fetch_afrr_prices import get_afrr_data
+from data_collection_module.fecth_aggr_demand_forecast import get_load_forecasts
+from data_collection_module.fetch_da_prices import get_day_ahead_prices
 
 load_dotenv(override=True)  
-entsoe_key = os.getenv('ENTSOE_API_KEY')
+entsoe_key = os.getenv('key_entso')
 
 client = EntsoePandasClient(api_key=entsoe_key)
 country_code = 'DK_1'
 start = pd.Timestamp('20240101', tz='Europe/Copenhagen')
-end = pd.Timestamp('20250410', tz='Europe/Copenhagen')
+end = pd.Timestamp('20250510', tz='Europe/Copenhagen')
 
 renewable_forecasts = get_wind_solar_data(start, end, price_area=country_code)
 afrr_data = get_afrr_data(start, end, price_area=country_code)

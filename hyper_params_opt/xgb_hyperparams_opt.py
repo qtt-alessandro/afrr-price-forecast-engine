@@ -169,7 +169,7 @@ def train_final_model(best_params, afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, exo
     return model
 
 
-def main(data_path, output_chunk_length, horizon, n_trials, save_results, output_dir):
+def main(data_path, output_chunk_length, horizon, n_trials, save_results, target_col, output_dir):
     """
     Main function to run the complete XGB model pipeline for aFRR price forecasting.
     
@@ -203,7 +203,8 @@ def main(data_path, output_chunk_length, horizon, n_trials, save_results, output
         val_start="2025-01-01 00:00:00",
         test_start="2025-03-01 00:00:00",
         test_end="2025-04-09 23:59:59",
-        use_validation=True
+        use_validation=True, 
+        target_col=target_col
     )
     
     # Find best hyperparameters using validation set
@@ -233,7 +234,8 @@ def main(data_path, output_chunk_length, horizon, n_trials, save_results, output
         afrr_pr_ts_scl_test=afrr_pr_ts_scl_test, 
         exog_ts_scl_test=exog_ts_scl_test, 
         afrr_pr_scaler=afrr_pr_scaler,
-        horizon=horizon
+        horizon=horizon,
+        target_col=target_col
     )
     
     # Clip forecasts to ensure positive values before evaluation
@@ -251,11 +253,11 @@ def main(data_path, output_chunk_length, horizon, n_trials, save_results, output
 
 
 if __name__ == "__main__":
-    default_data_path = "../data/afrr_price.parquet"
-    default_output_dir = "../data/results/"
+    default_data_path = "./data/afrr_price.parquet"
+    default_output_dir = "./data/results/"
     default_output_chunk_length = 24
     default_horizon = 24
-    default_n_trials = 10
+    default_n_trials = 1
     default_save_results = True
     
     main(
@@ -263,6 +265,7 @@ if __name__ == "__main__":
         output_chunk_length=default_output_chunk_length,
         horizon=default_horizon,
         n_trials=default_n_trials,
+        target_col='aFRR_UpCapPriceEUR',
         save_results=default_save_results,
         output_dir=default_output_dir
     )

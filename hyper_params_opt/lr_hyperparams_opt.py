@@ -32,8 +32,8 @@ def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, exog_ts_scl_train, 
     """
     def objective(trial):
         # Optimize lags
-        lags_max = trial.suggest_int("lags_max", 100, 400)
-        lags_past_covariates_max = trial.suggest_int("lags_past_covariates_max", 50, 150)
+        lags_max = trial.suggest_int("lags_max", 24, 100)
+        lags_past_covariates_max = trial.suggest_int("lags_past_covariates_max", 24, 100)
         
         # Create and train model
         model = LinearRegressionModel(
@@ -71,18 +71,7 @@ def optimize_model(afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, exog_ts_scl_train, 
 
 
 def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chunk_length):
-    """
-    Train Linear Regression model with the best parameters.
-    
-    Args:
-        best_params (dict): Best hyperparameters from optimization
-        afrr_pr_ts_scl_train (TimeSeries): Training target data
-        exog_ts_scl_train (TimeSeries): Training exogenous data
-        output_chunk_length (int): Output chunk length
-        
-    Returns:
-        LinearRegressionModel: Trained model
-    """
+
     model = LinearRegressionModel(
         output_chunk_length=output_chunk_length,
         lags=list(range(-1, -best_params["lags_max"], -1)),
@@ -95,20 +84,7 @@ def train_model(best_params, afrr_pr_ts_scl_train, exog_ts_scl_train, output_chu
 
 
 def train_final_model(best_params, afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, exog_ts_scl_train, exog_ts_scl_val, output_chunk_length):
-    """
-    Train the final model on combined training and validation data with best parameters.
-    
-    Args:
-        best_params (dict): Best hyperparameters from optimization
-        afrr_pr_ts_scl_train (TimeSeries): Training target data
-        afrr_pr_ts_scl_val (TimeSeries): Validation target data
-        exog_ts_scl_train (TimeSeries): Training exogenous data
-        exog_ts_scl_val (TimeSeries): Validation exogenous data
-        output_chunk_length (int): Output chunk length
-        
-    Returns:
-        LinearRegressionModel: Trained model on combined data
-    """
+
     # Combine training and validation data
     combined_train_data = concatenate([afrr_pr_ts_scl_train, afrr_pr_ts_scl_val], axis=0)
     combined_exog_data = concatenate([exog_ts_scl_train, exog_ts_scl_val], axis=0)
@@ -124,22 +100,8 @@ def train_final_model(best_params, afrr_pr_ts_scl_train, afrr_pr_ts_scl_val, exo
     return model
 
 
-def main(data_path, output_chunk_length, horizon, n_trials, save_results, output_dir):
-    """
-    Main function to run the complete LR model pipeline for aFRR price forecasting.
-    
-    Args:
-        data_path (str): Path to the parquet file containing aFRR price data
-        output_chunk_length (int): Output chunk length
-        horizon (int): Forecast horizon
-        n_trials (int): Number of optimization trials
-        save_results (bool): Whether to save results to JSON
-        output_dir (str): Directory to save results
-        
-    Returns:
-        tuple: Tuple containing trained model, forecasts, best parameters, and metrics
-    """
-    # Process data with validation split
+def main(data_path, output_chunk_length, horizon, n_trials, target_col, save_results, output_dir):
+
     (
         afrr_pr_ts_scl_train, 
         afrr_pr_ts_scl_val,
@@ -156,9 +118,10 @@ def main(data_path, output_chunk_length, horizon, n_trials, save_results, output
         train_start="2024-10-10 00:00:00",
         val_start="2025-01-01 00:00:00",
         test_start="2025-03-01 00:00:00",
-        test_end="2025-04-09 23:59:59",
-        use_validation=True
-    )
+        test_end="2025-05-04 23:59:59",
+        use_validation=True, 
+        target_col=target_col)
+
     
     # Find best hyperparameters using validation set
     best_params = optimize_model(
@@ -187,7 +150,8 @@ def main(data_path, output_chunk_length, horizon, n_trials, save_results, output
         afrr_pr_ts_scl_test=afrr_pr_ts_scl_test, 
         exog_ts_scl_test=exog_ts_scl_test, 
         afrr_pr_scaler=afrr_pr_scaler,
-        horizon=horizon
+        horizon=horizon, 
+        target_col=target_col
     )
     
     # Evaluate on test set
@@ -195,24 +159,24 @@ def main(data_path, output_chunk_length, horizon, n_trials, save_results, output
     print(f"Test set metrics: {metrics}")
     
     if save_results:
-        save_model_results("lr", best_params, metrics, output_dir)
+        save_model_results("lr_" + str(target_col), best_params, metrics, output_dir)
     
     return final_model, hist_forecasts, best_params, metrics
 
 
 if __name__ == "__main__":
-    default_data_path = "../data/afrr_price.parquet"
-    default_output_dir = "../data/results/"
+    default_data_path = "./data/afrr_price.parquet"
+    default_output_dir = "./data/results/"
     default_output_chunk_length = 24
     default_horizon = 24
     default_n_trials = 10
     default_save_results = True
-    
-    main(
-        data_path=default_data_path,
+
+    main(data_path=default_data_path,
         output_chunk_length=default_output_chunk_length,
         horizon=default_horizon,
         n_trials=default_n_trials,
+        target_col='aFRR_UpCapPriceEUR',
         save_results=default_save_results,
         output_dir=default_output_dir
     )

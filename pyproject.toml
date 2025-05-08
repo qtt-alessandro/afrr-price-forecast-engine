@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "energy_forecasting"
+version = "0.1.2"
+description = "Energy forecasting package"
+requires-python = ">=3.8"
+
+[tool.setuptools]
+packages = ["data_collection_module", "ensamble_forecast", "models", "utils"]

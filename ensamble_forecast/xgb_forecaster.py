@@ -7,7 +7,7 @@ from utils.afrr_preprocessing import preprocess_afrr_data
 
 
 def train_xgb_model(afrr_pr_ts_scl_train, exog_ts_scl_train, xgb_params, output_chunk_length):
-    """Train XGBoost model with quantile regression"""
+    """Train XGBoost model without quantile regression"""
     ts_encoders = {
         'cyclic': {'future': ['month']},
         'datetime_attribute': {'future': ['hour', 'dayofweek']},
@@ -23,8 +23,7 @@ def train_xgb_model(afrr_pr_ts_scl_train, exog_ts_scl_train, xgb_params, output_
         max_depth=xgb_params["max_depth"],
         learning_rate=xgb_params["learning_rate"],
         n_estimators=xgb_params["n_estimators"],
-        likelihood="quantile",
-        quantiles=[0.1, 0.5, 0.9],
+        # Removed likelihood="quantile" and quantiles parameters
     )
 
     xgb_model.fit(afrr_pr_ts_scl_train, past_covariates=exog_ts_scl_train)
@@ -32,44 +31,13 @@ def train_xgb_model(afrr_pr_ts_scl_train, exog_ts_scl_train, xgb_params, output_
     return xgb_model
 
 
-def unscale_quantile_forecasts(quantile_dfs, scaler):
-    """Unscale quantile forecasts using the provided scaler"""
-    unscaled_dfs = []
-    
-    for df in quantile_dfs:
-        # Create empty DataFrame to store unscaled results
-        df_unscaled = pd.DataFrame(index=df.index)
-        
-        # Unscale each quantile column individually
-        for col in df.columns:
-            # Create TimeSeries from the quantile column
-            ts = TimeSeries.from_series(df[col])
-            
-            # Inverse transform using the scaler
-            ts_unscaled = scaler.inverse_transform(ts)
-            
-            # Store back in DataFrame
-            df_unscaled[col] = ts_unscaled.pd_series()
-        
-        unscaled_dfs.append(df_unscaled)
-    
-    return unscaled_dfs
+def unscale_forecast(forecast_ts, scaler):
+    """Unscale forecast using the provided scaler"""
+    return scaler.inverse_transform(forecast_ts)
 
 
-def generate_xgb_forecasts(
-    xgb_model, 
-    afrr_pr_ts_scl_train, 
-    afrr_pr_ts_scl_test, 
-    exog_ts_scl_train, 
-    exog_ts_scl_test, 
-    forecast_horizon, 
-    stride, 
-    afrr_pr_scaler
-):
-    """
-    Generate forecasts with quantile outputs and return a single DataFrame with unscaled quantiles
-    """
-    # Generate backtests
+def generate_xgb_forecasts(xgb_model, afrr_pr_ts_scl_train, afrr_pr_ts_scl_test, exog_ts_scl_train, exog_ts_scl_test, forecast_horizon, stride, afrr_pr_scaler):
+
     xgb_backtest_forecasts = xgb_model.historical_forecasts(
         series=concatenate([afrr_pr_ts_scl_train, afrr_pr_ts_scl_test], axis=0),
         past_covariates=concatenate([exog_ts_scl_train, exog_ts_scl_test], axis=0),
@@ -81,47 +49,33 @@ def generate_xgb_forecasts(
         verbose=True
     )
     
-    # Convert forecasts to DataFrame
-    forecast_df = xgb_backtest_forecasts.pd_dataframe()
+    forecasts_unscaled = unscale_forecast(concatenate(xgb_backtest_forecasts), afrr_pr_scaler)
     
-    # Unscale the quantile forecasts
-    unscaled_dfs = []
-    for col in forecast_df.columns:
-        ts = TimeSeries.from_series(forecast_df[col])
-        ts_unscaled = afrr_pr_scaler.inverse_transform(ts)
-        unscaled_dfs.append(ts_unscaled.pd_series())
-    
-    # Combine into final DataFrame
-    final_df = pd.concat(unscaled_dfs, axis=1)
-    final_df.columns = ['quantile_0.1', 'quantile_0.5', 'quantile_0.9']
-    
+    final_df = forecasts_unscaled.with_columns_renamed(['aFRR_UpCapPriceEUR_cl'], col_names_new=['xgb_afrr_up_cap_price']).to_dataframe()
+
     return final_df
 
-def run_xgb_pipeline(data_path, hyper_params_path, train_start, test_start, 
-                    test_end, output_chunk_length, forecast_horizon, stride):
+
+def run_xgb_pipeline(data_path, target_col, hyper_params_path, train_start, test_start, test_end, output_chunk_length, forecast_horizon, stride):
     """Run the complete XGBoost forecasting pipeline"""
     
-    # Preprocess data
     (afrr_pr_ts_scl_train, 
-     afrr_pr_ts_scl_test, 
-     afrr_pr_ts_orig_train, 
-     afrr_pr_ts_orig_test, 
-     exog_ts_scl_train, 
-     exog_ts_scl_test,
-     afrr_pr_scaler) = preprocess_afrr_data(data_path, train_start, test_start, test_end)
+    afrr_pr_ts_scl_test, 
+    afrr_pr_ts_orig_train, 
+    afrr_pr_ts_orig_test, 
+    exog_ts_scl_train, 
+    exog_ts_scl_test,
+    afrr_pr_scaler) = preprocess_afrr_data(data_path, train_start, test_start, test_end, val_start=None, use_validation=False, target_col=target_col)
+
     
-    # Load hyperparameters
     xgb_opt_params = load_hyperparameters(file_path=hyper_params_path)
     
-    # Train XGBoost model
     xgb_model = train_xgb_model(
         afrr_pr_ts_scl_train, 
         exog_ts_scl_train, 
         xgb_opt_params, 
-        output_chunk_length
-    )
+        output_chunk_length)
     
-    # Generate and unscale forecasts
     xgb_results = generate_xgb_forecasts(
         xgb_model,
         afrr_pr_ts_scl_train,
@@ -133,9 +87,11 @@ def run_xgb_pipeline(data_path, hyper_params_path, train_start, test_start,
         afrr_pr_scaler
     )
     
+
+
     return xgb_model, xgb_results
 
-
+"""
 if __name__ == "__main__":
     # Define all parameters here at the end
     data_path = "./data/afrr_price.parquet"
@@ -165,5 +121,7 @@ if __name__ == "__main__":
     # Print information about the results
     print("XGBoost forecasting completed.")
     print(f"Number of forecast windows: {len(xgb_results)}")
-    print("Example forecast window (unscaled quantiles):")
-    print(xgb_results[0].head())
+    print("Example forecast window (unscaled):")
+    print(xgb_results.head())
+
+"""
