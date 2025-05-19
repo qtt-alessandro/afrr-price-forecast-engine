@@ -172,3 +172,7 @@ cython_debug/
 junk/
 .ipynb_checkpoints
 
+data_collection_module/copula_scen_gen copy 2.ipynb
+optimization/scenario_gen copy.ipynb
+/home/alqua/git/afrr-price-forecast-engine/data_collection_module/copula_scen_gen copy.ipynb
+data_collection_module/copula_scen_gen copy.ipynb

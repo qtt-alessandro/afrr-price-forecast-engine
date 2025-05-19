@@ -3,6 +3,7 @@ from statsmodels.tsa.arima.model import ARIMA
 from arch import arch_model
 from copulas.multivariate import GaussianMultivariate
 from copulas.univariate import BetaUnivariate, GaussianKDE, GaussianUnivariate
+from copulas.multivariate import VineCopula
 import pandas as pd
 import requests
 
@@ -97,7 +98,6 @@ def sample_from_quantile_range(std_residuals, lower_quantile, upper_quantile, n_
 def fit_sample_copula(residual_df:pd.DataFrame,columns:list, distribution:dict, return_df=False):
     
     dist = GaussianMultivariate(distribution=distribution)	
-
     dist.fit(residual_df[columns])
     synthetic = dist.sample(len(residual_df))
     if return_df:
@@ -141,3 +141,67 @@ def get_imbalance_price(start_date, end_date, price_area="DK1", sort_by="TimeUTC
         return None
     
     
+import plotly.express as px
+import pandas as pd
+
+def plot_3d_joint_distribution(real_data, synthetic_data, real_cols, synthetic_cols, title=None):
+    """
+    Plot a 3D scatter of both real and synthetic joint distributions.
+    
+    Args:
+        real_data (pd.DataFrame): Original dataset
+        synthetic_data (pd.DataFrame): Copula-generated synthetic dataset
+        real_cols (list): Columns for the real data [x, y, z]
+        synthetic_cols (list): Columns for the synthetic data [x, y, z]
+        title (str, optional): Plot title
+        
+    Returns:
+        plotly.graph_objects.Figure
+    """
+    # Prepare the real data
+    real_df = real_data[real_cols].copy()
+    real_df.columns = ['x', 'y', 'z']  # Standardize column names for merging
+    real_df['Data'] = 'Real'
+    
+    # Prepare the synthetic data
+    synthetic_df = synthetic_data[synthetic_cols].copy()
+    synthetic_df.columns = ['x', 'y', 'z']
+    synthetic_df['Data'] = 'Synthetic'
+    
+    # Combine both datasets
+    combined_df = pd.concat([real_df, synthetic_df], axis=0)
+    
+    # Set a default title if none provided
+    if not title:
+        title = f"Joint Distribution (Real vs. Synthetic)"
+    
+    # Create the 3D scatter plot
+    fig = px.scatter_3d(
+        combined_df,
+        x='x',
+        y='y',
+        z='z',
+        color='Data',
+        color_discrete_map={'Real': 'blue', 'Synthetic': 'red'},
+        symbol='Data',
+        title=title,
+        opacity=0.7,
+        labels={'x': real_cols[0], 'y': real_cols[1], 'z': real_cols[2]}  # Use original column names for axes
+    )
+    
+    # Customize markers and layout
+    fig.update_traces(marker={'size': 4})
+    
+    fig.update_layout(
+        scene=dict(
+            xaxis_title=real_cols[0],
+            yaxis_title=real_cols[1],
+            zaxis_title=real_cols[2]
+        ),
+        plot_bgcolor='white',
+        font={'size': 12},
+        margin=dict(l=0, r=0, b=0, t=30),
+        legend_title_text='Data Type'
+    )
+    
+    return fig
